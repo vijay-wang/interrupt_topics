@@ -98,10 +98,12 @@ At any instant a CPU is in exactly one of these contexts, and the rules differ s
 
 | Context | May sleep? | May call blocking alloc? | Typical work | How to detect |
 |---|---|---|---|---|
-| **process / task** | yes | yes (`GFP_KERNEL`) | syscalls, kthreads, threaded IRQ handlers | `in_task()` |
-| **softirq / bottom-half** | **no** | no (`GFP_ATOMIC` only) | network RX, timers, tasklets | `in_serving_softirq()` |
+| **process / task** | yes | yes (`GFP_KERNEL`) | syscalls, kthreads, threaded IRQ handlers, **workqueue workers** | `in_task()` |
+| **softirq** | **no** | no (`GFP_ATOMIC` only) | network RX, timers, tasklets | `in_serving_softirq()` |
 | **hardirq (interrupt)** | **no** | no | top-half handlers, flow handlers | `in_hardirq()` |
 | **NMI** | **no** (and almost nothing else) | no | watchdog, perf | `in_nmi()` |
+
+> **Note — "bottom half" is overloaded; don't read the softirq row as "all deferred work can't sleep".** These four are the *execution contexts*. A **workqueue** or a **threaded IRQ** is a *bottom-half mechanism* that runs in the **process/task** row above — so it **can** sleep. Only the **softirq** context (softirqs/tasklets) is the atomic, no-sleep bottom half. Precisely: *"softirq context can't sleep"* is always true; *"all bottom halves can't sleep"* is false. When you must sleep in deferred work, use a workqueue or threaded IRQ (Topics 07/09), not a tasklet.
 
 These predicates are literally bit-tests on one per-CPU word, **`preempt_count`** (`include/linux/preempt.h`):
 
